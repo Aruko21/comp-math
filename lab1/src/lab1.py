@@ -29,7 +29,7 @@ def l_i(i, x, x_nodes):
 
 def L(x, x_nodes, y_nodes):
     if len(x_nodes) != len(y_nodes):
-        print("ERROR!")
+        print("The dimensions of the nodes x and y doesn't match")
 
     basis = [l_i(i, x, x_nodes) for i in range(len(x_nodes))]
     return np.sum(y_nodes * basis)

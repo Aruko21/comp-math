@@ -4,7 +4,7 @@ import numpy as np
 from scipy.special import erf
 
 SAVE_DPI = 300
-SAVE_IMG_LOCATION = '../graphics'
+SAVE_IMG_LOCATION = 'graphics'
 
 
 def uniform_convergence(func1_arr, func2_arr):
@@ -153,7 +153,7 @@ class InterpolPlots:
         plt.show()
 
         if self.save_file:
-            fig.savefig(SAVE_IMG_LOCATION + "/3a_" + self.graph_name + ".png", dpi=SAVE_DPI)
+            fig.savefig(SAVE_IMG_LOCATION + "/3a_" + self.graph_name + "-odd_even.png", dpi=SAVE_DPI)
 
         return
 

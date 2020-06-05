@@ -1,24 +1,27 @@
 import numpy as np
 import pathlib
-import timeit
-from scipy.optimize import root
-from numpy.random import rand
+
 import labs.lab4.src.graphics as graph
 
-SAVE_FILE = True
+SAVE_FILE = False
 ROOT_DIR = str(pathlib.Path().absolute())
 PLOTS_DPI = 300
 
 SINGULAR_EPSILON = 1e-1
+SILVESTER_EPSILON = 5e-1
 
 
 def silvester_criterion(A):
     n = len(A)
 
     for k in range(2, n, 1):
-        if not np.linalg.det(A[:k, :k]) > 0:
+        if np.linalg.det(A[:k, :k]) < SILVESTER_EPSILON:
             return False
     return True
+
+
+def is_matrix_singular_old(A):
+    return np.linalg.det(A) == 0
 
 
 def is_matrix_singular(A):
@@ -113,6 +116,7 @@ def cholesky(A, b):
             if i == j:  # Diagonal element
                 under_sqrt_expression = A[i, i] - tmp_sum
                 if under_sqrt_expression < 0:
+                    print("Check negative: ", under_sqrt_expression)
                     raise ValueError("Negative value under sqrt. A matrix isn't positive definitive")
                 elif under_sqrt_expression == 0:
                     raise ValueError("L matrix is singular. A matrix isn't positive definitive")
@@ -191,13 +195,7 @@ def modify_to_DP(matrix):
     return matrix
 
 
-def modigy_to_PD(matrix):
-    n = len(matrix)
-
-    # while is_matrix_singular(matrix):
-    #     coef = gen_rand_on_interval(1, -1, 1)
-    #     matrix += coef * np.eye(n)
-
+def modify_to_PD(matrix):
     symm_matrix = np.dot(matrix, matrix.T)
 
     max_elem = np.max(np.abs(symm_matrix))
@@ -241,7 +239,7 @@ def generate_rand_matrix(n, type="default"):
     if type == "DP":
         gen_matrix = modify_to_DP(gen_matrix)
     elif type == "PD":
-        gen_matrix = modigy_to_PD(gen_matrix)
+        gen_matrix = modify_to_PD(gen_matrix)
     elif type == "TD":
         gen_matrix = modify_to_TD(gen_matrix)
 
@@ -256,29 +254,48 @@ def cond_number(matrix):
     return np.linalg.cond(matrix)
 
 
+def rel_err_rms(exact, approximate):
+    # Relative error using the RMS norm
+    n = len(exact)
+
+    absolute_err = np.sum([(exact[i] - approximate[i]) ** 2 for i in range(n)])
+    norm = np.sum([(exact[i] ** 2) for i in range(n)])
+
+    return np.sqrt(absolute_err) / np.sqrt(norm)
+
+
+def rel_err_supremum(exact, approximate):
+    # Relative error using the supremum norm
+    return np.max(np.abs(exact - approximate)) / np.max(np.abs(exact))
+
+
+def eigenvals_rel(matrix):
+    abs_matr_eigvals = np.abs(np.linalg.eigvals(matrix))
+    return np.max(abs_matr_eigvals) / np.min(abs_matr_eigvals)
+
+
 def main():
     print("Laboratory work #4 on the 'Computational Mathematics' course.\n Done by Kosenkov Aleksandr - RC6-64B\n")
 
-    # A = np.array([[1., 5., 3.],
-    #               [3., 4., 5.],
-    #               [6., 7., 8.]])
-    # b = np.array([[3.], [2.], [3.]])
-    # print("Gauss without pivoting:\n", gauss(A, b, False))
-    # print("Gauss with pivoting:\n", gauss(A, b))
-    # print("Real solution:\n", np.linalg.solve(A, b))
+    A = np.array([[1., 5., 3.],
+                  [3., 4., 5.],
+                  [6., 7., 8.]])
+    b = np.array([[3.], [2.], [3.]])
+    print("Gauss without pivoting:\n", gauss(A, b, False))
+    print("Gauss with pivoting:\n", gauss(A, b))
+    print("Real solution:\n", np.linalg.solve(A, b))
 
-    # A = np.array([[6., 3., 4.],
-    #               [3., 6., 5.],
-    #               [4., 5., 10.]])
-    # b = np.array([[3.], [2.], [3.]])
-    # print("Gauss with pivoting:\n", gauss(A, b))
-    # print("Cholesky decomposition:\n", cholesky(A, b))
-    # print("Real solution:\n", np.linalg.solve(A, b))
+    A = np.array([[6., 3., 4.],
+                  [3., 6., 5.],
+                  [4., 5., 10.]])
+    b = np.array([[3.], [2.], [3.]])
+    print("Gauss with pivoting:\n", gauss(A, b))
+    print("Cholesky decomposition:\n", cholesky(A, b))
+    print("Real solution:\n", np.linalg.solve(A, b))
 
     A = np.array([[1., 5., 0.],
                   [3., 4., 5., ],
                   [0., 7., 8.]])
-    print("Just test: ", np.linalg.det(A))
     b = np.array([[3.], [2.], [3.]])
     print("Gauss with pivoting:\n", gauss(A, b))
     print("Thomas method:\n", thomas(A, b))
@@ -292,6 +309,23 @@ def main():
         "PD": silvester_criterion
     }
 
+    default_methods = {
+        "default": lambda A, b: gauss(A, b, pivoting=False),
+        "DP": lambda A, b: gauss(A, b, pivoting=False),
+        "TD": thomas,
+        "PD": cholesky
+    }
+    # types = ["PD"]
+    # type_checkers = {
+    #     "PD": silvester_criterion
+    # }
+    #
+    # default_methods = {
+    #     "PD": cholesky
+    # }
+
+    b_sol = np.array([1., 1., 1., 1.]).T
+
     for type in types:
         matrices = []
         for i in range(1000):
@@ -302,7 +336,7 @@ def main():
 
             matrices.append(gen_matrix)
 
-        matrix_plots = graph.MatricesPlots(matrices_data=matrices, save_file=SAVE_FILE)
+        matrix_plots = graph.MatricesPlots(save_file=SAVE_FILE)
         spectral_rad = [spectral_radius(matrix) for matrix in matrices]
         cond_numbers = [cond_number(matrix) for matrix in matrices]
 
@@ -312,12 +346,30 @@ def main():
             np.linalg.det((matrices[max_cond_index]))
         ))
 
-        matrix_plots.show_hist(data=spectral_rad, columns_number=50, label="Spectral radius for {} matr".format(type),
-                               x_label="Spectral rad", name="spec_rad_{}_1e-1".format(type))
-        matrix_plots.show_hist(data=cond_numbers, columns_number=50, label="Cond numbers for {} matr".format(type),
-                               x_label="Cond number", name="cond_num_{}_1e-1".format(type))
+        matrix_plots.show_hist(data=spectral_rad, columns_number=50,
+                               label="Spectral radius for {} matrices".format(type),
+                               x_label="Spectral radius", name="spec_rad_{}_1e-1".format(type))
+        matrix_plots.show_hist(data=cond_numbers, columns_number=50,
+                               label="Condition numbers for {} matrices".format(type),
+                               x_label="Condition number", name="cond_num_{}_1e-1".format(type))
 
-    b_sol = np.array([1., 1., 1., 1.]).T
+        solutions_exact = [gauss(matrix, b_sol, pivoting=True) for matrix in matrices]
+        solutions_default = [default_methods[type](matrix, b_sol) for matrix in matrices]
 
+        rms_err = [rel_err_rms(exact=solutions_exact[i], approximate=solutions_default[i]) for i in
+                   range(len(solutions_exact))]
+        supremum_err = [rel_err_supremum(exact=solutions_exact[i], approximate=solutions_default[i]) for i in
+                        range(len(solutions_exact))]
+        eig_rels = [eigenvals_rel(matrix) for matrix in matrices]
+
+        matrix_plots.show_hist(data=rms_err, columns_number=50,
+                               label="Relative error using the RMS norm for {} matrices".format(type),
+                               x_label="Error", name="rms_err_{}".format(type))
+        matrix_plots.show_hist(data=supremum_err, columns_number=50,
+                               label="Relative error using the supremum norm for {} matrices".format(type),
+                               x_label="Error", name="supremum_err_{}".format(type))
+        matrix_plots.show_hist(data=eig_rels, columns_number=50,
+                               label="Relative max eigenvalue to min for {} matrices".format(type),
+                               x_label="Relative", name="eig_rel_{}".format(type))
 
 main()
